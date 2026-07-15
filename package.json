@@ -1,0 +1,16 @@
+{
+  "name": "com.gum4.serializablecollections",
+  "version": "0.1.0",
+  "displayName": "Serializable Collections",
+  "description": "Unity Inspector-serializable Dictionary and HashSet with duplicate-key/-item detection and Inspector highlighting.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Gum4"
+  },
+  "keywords": [
+    "dictionary",
+    "hashset",
+    "serialization",
+    "inspector"
+  ]
+}
