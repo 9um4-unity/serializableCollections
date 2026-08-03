@@ -51,8 +51,7 @@ namespace Gum4.SerializableCollections.Editor
                 draggable: true, displayHeader: true,
                 displayAddButton: true, displayRemoveButton: true);
 
-            list.drawHeaderCallback = rect =>
-                EditorGUI.LabelField(rect, dictProp.displayName);
+            list.drawHeaderCallback = rect => DrawHeaderLabel(rect, dictProp.displayName);
 
             list.elementHeightCallback = index =>
             {
@@ -169,6 +168,16 @@ namespace Gum4.SerializableCollections.Editor
         }
 
         // ── 유틸 ─────────────────────────────────────────────────
+
+        // 리스트 박스(테이블) 자체는 부모 들여쓰기를 따라 이미 밀려 있으므로,
+        // 헤더 제목까지 LabelField가 indentLevel을 또 반영하면 이중으로 들여써진다 — 헤더만 0으로 리셋.
+        private static void DrawHeaderLabel(Rect rect, string text)
+        {
+            var indent = EditorGUI.indentLevel;
+            EditorGUI.indentLevel = 0;
+            EditorGUI.LabelField(rect, text);
+            EditorGUI.indentLevel = indent;
+        }
 
         private bool IsTextAreaValue(SerializedProperty valProp)
             => _textArea != null && valProp.propertyType == SerializedPropertyType.String;
