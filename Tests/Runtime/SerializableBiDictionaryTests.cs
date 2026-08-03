@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Gum4.SerializableCollections;
@@ -127,6 +128,33 @@ namespace Gum4.SerializableCollections.Tests
 
             Assert.AreEqual("b", dict.Pairs[0].Key);
             Assert.AreEqual("a", dict.Pairs[1].Key);
+        }
+
+        // ── foreach: ToDictionary() 없이 정방향 직접 순회 ──────────────
+
+        [Test]
+        public void Foreach_YieldsForwardPairs_WithoutToDictionary()
+        {
+            var dict = FromJson(@"{""_pairs"":[{""Key"":""joy"",""Value"":1},{""Key"":""fear"",""Value"":2}]}");
+
+            var seen = new Dictionary<string, int>();
+            foreach (var pair in dict)
+                seen[pair.Key] = pair.Value;
+
+            Assert.AreEqual(2, seen.Count);
+            Assert.AreEqual(1, seen["joy"]);
+            Assert.AreEqual(2, seen["fear"]);
+        }
+
+        [Test]
+        public void Foreach_EmptyDictionary_YieldsNothing()
+        {
+            var dict = new SerializableBiDictionary<string, int>();
+
+            var count = 0;
+            foreach (var _ in dict) count++;
+
+            Assert.AreEqual(0, count);
         }
 
         // ── 중복 키: Runtime에서만 경고, Edit 모드에서는 조용 ──────────

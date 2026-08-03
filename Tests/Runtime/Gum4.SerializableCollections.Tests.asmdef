@@ -2,8 +2,7 @@
     "name": "Gum4.SerializableCollections.Tests",
     "rootNamespace": "Gum4.SerializableCollections.Tests",
     "references": [
-        "Gum4.SerializableCollections",
-        "UnityEngine.TestRunner"
+        "Gum4.SerializableCollections"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -17,5 +16,8 @@
         "UNITY_INCLUDE_TESTS"
     ],
     "versionDefines": [],
-    "noEngineReferences": false
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
 }

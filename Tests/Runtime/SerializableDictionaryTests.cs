@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Gum4.SerializableCollections;
@@ -83,6 +84,46 @@ namespace Gum4.SerializableCollections.Tests
 
             Assert.AreEqual("b", dict.Pairs[0].Key);
             Assert.AreEqual("a", dict.Pairs[1].Key);
+        }
+
+        // ── foreach: ToDictionary() 없이 직접 순회 ─────────────────────
+
+        [Test]
+        public void Foreach_YieldsAllPairs_WithoutToDictionary()
+        {
+            var dict = FromJson(@"{""_pairs"":[{""Key"":""joy"",""Value"":1},{""Key"":""fear"",""Value"":2}]}");
+
+            var seen = new Dictionary<string, int>();
+            foreach (var pair in dict)
+                seen[pair.Key] = pair.Value;
+
+            Assert.AreEqual(2, seen.Count);
+            Assert.AreEqual(1, seen["joy"]);
+            Assert.AreEqual(2, seen["fear"]);
+        }
+
+        [Test]
+        public void Foreach_EmptyDictionary_YieldsNothing()
+        {
+            var dict = new SerializableDictionary<string, int>();
+
+            var count = 0;
+            foreach (var _ in dict) count++;
+
+            Assert.AreEqual(0, count);
+        }
+
+        [Test]
+        public void Foreach_AsIEnumerable_YieldsAllPairs()
+        {
+            var dict = FromJson(@"{""_pairs"":[{""Key"":""joy"",""Value"":1}]}");
+
+            IEnumerable<KeyValuePair<string, int>> enumerable = dict;
+            var seen = new List<KeyValuePair<string, int>>(enumerable);
+
+            Assert.AreEqual(1, seen.Count);
+            Assert.AreEqual("joy", seen[0].Key);
+            Assert.AreEqual(1, seen[0].Value);
         }
 
         // ── 중복 키: Runtime에서만 경고, Edit 모드에서는 조용 ──────────

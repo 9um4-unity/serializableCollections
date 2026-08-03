@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Gum4.SerializableCollections;
@@ -67,6 +68,31 @@ namespace Gum4.SerializableCollections.Tests
             Assert.AreEqual(2, restored.Items.Count);
             Assert.IsTrue(restored.Contains(4));
             Assert.IsTrue(restored.Contains(8));
+        }
+
+        // ── foreach: ToHashSet() 없이 직접 순회 ────────────────────────
+
+        [Test]
+        public void Foreach_YieldsAllItems_WithoutToHashSet()
+        {
+            var set = FromJson(@"{""_items"":[1,3,5]}");
+
+            var seen = new HashSet<int>();
+            foreach (var item in set) seen.Add(item);
+
+            Assert.AreEqual(3, seen.Count);
+            CollectionAssert.AreEquivalent(new[] { 1, 3, 5 }, seen);
+        }
+
+        [Test]
+        public void Foreach_EmptySet_YieldsNothing()
+        {
+            var set = new SerializableHashSet<int>();
+
+            var count = 0;
+            foreach (var _ in set) count++;
+
+            Assert.AreEqual(0, count);
         }
 
         // ── 중복 항목: Runtime에서만 경고, Edit 모드에서는 조용 ────────

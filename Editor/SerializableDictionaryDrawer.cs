@@ -204,19 +204,29 @@ namespace Gum4.SerializableCollections.Editor
                  + ValueHeight(valProp);
         }
 
+        // 대략적인 줄바꿈 폭 추정치 — 실제 Inspector 너비에 따라 오차는 있지만,
+        // EditorGUIUtility.currentViewWidth(OnGUI 컨텍스트 밖에서 호출 시 예외)에 기대지 않기 위해 고정값을 쓴다.
+        private const int TextAreaCharsPerLine = 60;
+
         private float ValueHeight(SerializedProperty valProp)
         {
             if (!IsTextAreaValue(valProp)) return EditorGUI.GetPropertyHeight(valProp, true);
 
-            var lineH   = EditorGUIUtility.singleLineHeight;
-            var width   = Mathf.Max(EditorGUIUtility.currentViewWidth - 60f, 50f);
-            var content = new GUIContent(valProp.stringValue);
-            var textH   = EditorStyles.textArea.CalcHeight(content, width);
-            var minH    = lineH * _textArea.minLines;
-            var maxH    = lineH * _textArea.maxLines;
-            var clamped = Mathf.Clamp(textH, minH, maxH);
+            var lineH    = EditorGUIUtility.singleLineHeight;
+            var lines    = CountWrappedLines(valProp.stringValue);
+            var clamped  = Mathf.Clamp(lines, _textArea.minLines, _textArea.maxLines);
 
-            return lineH + clamped; // 라벨 한 줄 + 텍스트 영역
+            return lineH + clamped * lineH; // 라벨 한 줄 + 텍스트 영역
+        }
+
+        private static int CountWrappedLines(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 1;
+
+            var total = 0;
+            foreach (var segment in text.Split('\n'))
+                total += Mathf.Max(1, Mathf.CeilToInt(segment.Length / (float)TextAreaCharsPerLine));
+            return Mathf.Max(1, total);
         }
 
         private static bool IsDuplicate(SerializedProperty pairsProp, int self, SerializedProperty keyProp)
