@@ -16,9 +16,11 @@ namespace Gum4.SerializableCollections.Editor
 
         private readonly Dictionary<(Object obj, string path), ReorderableList> _cache = new();
 
-        // 제네릭 Pair.Value 필드에는 직접 [TextArea]를 붙일 수 없으므로,
-        // 딕셔너리 필드 자체에 붙은 [TextArea]를 대신 읽어 Value(문자열)에 적용한다.
-        private TextAreaAttribute _textArea;
+        // 제네릭 Pair.Value 필드에는 직접 속성을 붙일 수 없으므로, 딕셔너리 필드 자체에 붙은
+        // [SerializableTextArea]를 대신 읽어 Value(문자열)에 적용한다.
+        // Unity 내장 [TextArea]는 쓰지 않는다 — List 필드에 붙이면 하위 모든 프로퍼티(Key 포함)에도
+        // 전파되어 문자열이 아닌 Key에까지 TextAreaDrawer가 오작동한다.
+        private SerializableTextAreaAttribute _textArea;
         private bool _textAreaResolved;
 
         private void ResolveTextArea()
@@ -26,8 +28,8 @@ namespace Gum4.SerializableCollections.Editor
             if (_textAreaResolved) return;
             _textAreaResolved = true;
             if (fieldInfo == null) return;
-            var attrs = fieldInfo.GetCustomAttributes(typeof(TextAreaAttribute), true);
-            if (attrs.Length > 0) _textArea = (TextAreaAttribute)attrs[0];
+            var attrs = fieldInfo.GetCustomAttributes(typeof(SerializableTextAreaAttribute), true);
+            if (attrs.Length > 0) _textArea = (SerializableTextAreaAttribute)attrs[0];
         }
 
         private ReorderableList GetList(SerializedProperty dictProp)

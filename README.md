@@ -38,10 +38,11 @@ void Awake()
 }
 ```
 
-여러 줄 문자열을 담는 `SerializableDictionary<TKey, string>` 필드에는 `[TextArea]`를 붙이면 Value가 여러 줄 편집 영역으로 그려집니다:
+여러 줄 문자열을 담는 `SerializableDictionary<TKey, string>` 필드에는 `[SerializableTextArea]`를 붙이면 Value가 여러 줄 편집 영역으로 그려집니다.
+(Unity 내장 `[TextArea]`는 쓰지 마세요 — List 필드에 붙이면 하위의 모든 프로퍼티(Key 포함)에도 전파되어, 문자열이 아닌 Key에까지 TextAreaDrawer가 적용되며 오작동합니다.)
 
 ```csharp
-[SerializeField, TextArea(3, 5)]
+[SerializeField, SerializableTextArea(3, 5)]
 private SerializableDictionary<DialoguePhase, string> dialogues;
 ```
 
