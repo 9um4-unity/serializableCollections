@@ -98,6 +98,8 @@ namespace Gum4.SerializableCollections.Editor
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
+            // ReorderableList는 indentLevel을 무시하므로, 중첩된 필드일 때 부모 들여쓰기에 맞춰 직접 보정한다.
+            position = EditorGUI.IndentedRect(position);
             GetList(property).DoList(position);
             EditorGUI.EndProperty();
         }

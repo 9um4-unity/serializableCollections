@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,7 +9,7 @@ namespace Gum4.SerializableCollections
     public abstract class SerializableHashSetBase { }
 
     [Serializable]
-    public class SerializableHashSet<T> : SerializableHashSetBase, ISerializationCallbackReceiver
+    public class SerializableHashSet<T> : SerializableHashSetBase, ISerializationCallbackReceiver, IEnumerable<T>
     {
         [SerializeField] private List<T> _items = new();
 
@@ -44,5 +45,12 @@ namespace Gum4.SerializableCollections
         void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 
         void ISerializationCallbackReceiver.OnAfterDeserialize() => _cache = null;
+
+        // ToHashSet()로 복사본을 만들지 않아도 바로 foreach를 쓸 수 있도록 캐시를 직접 노출한다.
+        public HashSet<T>.Enumerator GetEnumerator() => Cache.GetEnumerator();
+
+        IEnumerator<T> IEnumerable<T>.GetEnumerator() => Cache.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => Cache.GetEnumerator();
     }
 }

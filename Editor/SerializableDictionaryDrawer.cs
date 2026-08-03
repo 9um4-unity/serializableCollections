@@ -16,6 +16,20 @@ namespace Gum4.SerializableCollections.Editor
 
         private readonly Dictionary<(Object obj, string path), ReorderableList> _cache = new();
 
+        // 제네릭 Pair.Value 필드에는 직접 [TextArea]를 붙일 수 없으므로,
+        // 딕셔너리 필드 자체에 붙은 [TextArea]를 대신 읽어 Value(문자열)에 적용한다.
+        private TextAreaAttribute _textArea;
+        private bool _textAreaResolved;
+
+        private void ResolveTextArea()
+        {
+            if (_textAreaResolved) return;
+            _textAreaResolved = true;
+            if (fieldInfo == null) return;
+            var attrs = fieldInfo.GetCustomAttributes(typeof(TextAreaAttribute), true);
+            if (attrs.Length > 0) _textArea = (TextAreaAttribute)attrs[0];
+        }
+
         private ReorderableList GetList(SerializedProperty dictProp)
         {
             var target   = dictProp.serializedObject.targetObject;
@@ -29,7 +43,7 @@ namespace Gum4.SerializableCollections.Editor
             return list;
         }
 
-        private static ReorderableList BuildList(SerializedProperty dictProp)
+        private ReorderableList BuildList(SerializedProperty dictProp)
         {
             var pairsProp = dictProp.FindPropertyRelative(PairsField);
             var list = new ReorderableList(
@@ -64,7 +78,7 @@ namespace Gum4.SerializableCollections.Editor
 
         // ── 렌더링 ────────────────────────────────────────────────
 
-        private static void DrawPair(Rect rect, SerializedProperty elem, bool isDup)
+        private void DrawPair(Rect rect, SerializedProperty elem, bool isDup)
         {
             if (IsSimple(elem))
             {
@@ -73,7 +87,7 @@ namespace Gum4.SerializableCollections.Editor
                 return;
             }
 
-            // 복합형: Key 한 줄 → Value 한 줄(또는 펼쳐지는 foldout)
+            // 복합형: Key 한 줄 → Value 한 줄(또는 펼쳐지는 foldout/TextArea)
             var keyProp = elem.FindPropertyRelative("Key");
             var valProp = elem.FindPropertyRelative("Value");
             var keyH    = EditorGUI.GetPropertyHeight(keyProp, true);
@@ -97,11 +111,28 @@ namespace Gum4.SerializableCollections.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUI.PropertyField(valRect, valProp, new GUIContent("Value"), true);
+            DrawValue(valRect, valProp, new GUIContent("Value"));
             EditorGUI.indentLevel--;
         }
 
-        private static void DrawInline(Rect rect, SerializedProperty elem, bool dupKey)
+        private void DrawValue(Rect rect, SerializedProperty valProp, GUIContent label)
+        {
+            if (IsTextAreaValue(valProp))
+            {
+                var lineH = EditorGUIUtility.singleLineHeight;
+                var labelRect = new Rect(rect.x, rect.y, rect.width, lineH);
+                var areaRect  = new Rect(rect.x, rect.y + lineH, rect.width, rect.height - lineH);
+
+                EditorGUI.LabelField(labelRect, label);
+                var indentedAreaRect = EditorGUI.IndentedRect(areaRect);
+                valProp.stringValue = EditorGUI.TextArea(indentedAreaRect, valProp.stringValue, EditorStyles.textArea);
+                return;
+            }
+
+            EditorGUI.PropertyField(rect, valProp, label, true);
+        }
+
+        private void DrawInline(Rect rect, SerializedProperty elem, bool dupKey)
         {
             const float Arrow = 20f;
             var keyW = (rect.width - Arrow) * 0.38f;
@@ -139,21 +170,42 @@ namespace Gum4.SerializableCollections.Editor
 
         // ── 유틸 ─────────────────────────────────────────────────
 
-        private static bool IsSimple(SerializedProperty elem)
+        private bool IsTextAreaValue(SerializedProperty valProp)
+            => _textArea != null && valProp.propertyType == SerializedPropertyType.String;
+
+        private bool IsSimple(SerializedProperty elem)
         {
             var k = elem.FindPropertyRelative("Key");
             var v = elem.FindPropertyRelative("Value");
-            return k != null && v != null && !k.hasVisibleChildren && !v.hasVisibleChildren;
+            if (k == null || v == null) return false;
+            if (k.hasVisibleChildren || v.hasVisibleChildren) return false;
+            if (IsTextAreaValue(v)) return false; // TextArea는 항상 Key 아래 세로 배치로 그린다
+            return true;
         }
 
-        private static float PairHeight(SerializedProperty elem)
+        private float PairHeight(SerializedProperty elem)
         {
             if (IsSimple(elem)) return EditorGUIUtility.singleLineHeight;
             var keyProp = elem.FindPropertyRelative("Key");
             var valProp = elem.FindPropertyRelative("Value");
             return EditorGUI.GetPropertyHeight(keyProp, true)
                  + Spacing
-                 + EditorGUI.GetPropertyHeight(valProp, true);
+                 + ValueHeight(valProp);
+        }
+
+        private float ValueHeight(SerializedProperty valProp)
+        {
+            if (!IsTextAreaValue(valProp)) return EditorGUI.GetPropertyHeight(valProp, true);
+
+            var lineH   = EditorGUIUtility.singleLineHeight;
+            var width   = Mathf.Max(EditorGUIUtility.currentViewWidth - 60f, 50f);
+            var content = new GUIContent(valProp.stringValue);
+            var textH   = EditorStyles.textArea.CalcHeight(content, width);
+            var minH    = lineH * _textArea.minLines;
+            var maxH    = lineH * _textArea.maxLines;
+            var clamped = Mathf.Clamp(textH, minH, maxH);
+
+            return lineH + clamped; // 라벨 한 줄 + 텍스트 영역
         }
 
         private static bool IsDuplicate(SerializedProperty pairsProp, int self, SerializedProperty keyProp)
@@ -173,11 +225,17 @@ namespace Gum4.SerializableCollections.Editor
         // ── PropertyDrawer 진입점 ────────────────────────────────
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-            => GetList(property).GetHeight();
+        {
+            ResolveTextArea();
+            return GetList(property).GetHeight();
+        }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
+            ResolveTextArea();
             EditorGUI.BeginProperty(position, label, property);
+            // ReorderableList는 indentLevel을 무시하므로, 중첩된 필드일 때 부모 들여쓰기에 맞춰 직접 보정한다.
+            position = EditorGUI.IndentedRect(position);
             GetList(property).DoList(position);
             EditorGUI.EndProperty();
         }

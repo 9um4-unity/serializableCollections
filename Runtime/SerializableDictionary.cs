@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,7 +10,8 @@ namespace Gum4.SerializableCollections
     public abstract class SerializableDictionaryBase { }
 
     [Serializable]
-    public class SerializableDictionary<TKey, TValue> : SerializableDictionaryBase, ISerializationCallbackReceiver
+    public class SerializableDictionary<TKey, TValue> : SerializableDictionaryBase, ISerializationCallbackReceiver,
+        IEnumerable<KeyValuePair<TKey, TValue>>
     {
         [Serializable]
         public struct Pair
@@ -60,5 +62,12 @@ namespace Gum4.SerializableCollections
         void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 
         void ISerializationCallbackReceiver.OnAfterDeserialize() => _cache = null;
+
+        // ToDictionary()로 복사본을 만들지 않아도 바로 foreach를 쓸 수 있도록 캐시를 직접 노출한다.
+        public Dictionary<TKey, TValue>.Enumerator GetEnumerator() => Cache.GetEnumerator();
+
+        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() => Cache.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => Cache.GetEnumerator();
     }
 }

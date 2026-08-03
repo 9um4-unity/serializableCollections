@@ -31,7 +31,18 @@ void Awake()
     if (unlockedIds.Contains("region_01")) { ... }
     if (idByName.TryGetValue("joy", out var id)) { ... }   // 정방향: 이름 → id
     if (idByName.TryGetKey(1, out var name)) { ... }       // 역방향: id → 이름
+
+    // ToDictionary()/ToHashSet() 없이 바로 순회 가능
+    foreach (var (name, score) in scoresByName) { ... }
+    foreach (var id in unlockedIds) { ... }
 }
+```
+
+여러 줄 문자열을 담는 `SerializableDictionary<TKey, string>` 필드에는 `[TextArea]`를 붙이면 Value가 여러 줄 편집 영역으로 그려집니다:
+
+```csharp
+[SerializeField, TextArea(3, 5)]
+private SerializableDictionary<DialoguePhase, string> dialogues;
 ```
 
 ## 동작 계약

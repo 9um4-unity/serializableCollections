@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -11,7 +12,8 @@ namespace Gum4.SerializableCollections
     // 양방향 조회를 위해 Key/Value 양쪽 모두 유일해야 한다 — 한쪽이라도 중복되면
     // 역방향 캐시 구축 시 첫 번째 쌍만 유효해지고 나머지는 무시된다.
     [Serializable]
-    public class SerializableBiDictionary<TKey, TValue> : SerializableBiDictionaryBase, ISerializationCallbackReceiver
+    public class SerializableBiDictionary<TKey, TValue> : SerializableBiDictionaryBase, ISerializationCallbackReceiver,
+        IEnumerable<KeyValuePair<TKey, TValue>>
     {
         [Serializable]
         public struct Pair
@@ -103,5 +105,12 @@ namespace Gum4.SerializableCollections
             _forward = null;
             _reverse = null;
         }
+
+        // ToDictionary()로 복사본을 만들지 않아도 바로 foreach를 쓸 수 있도록 정방향 캐시를 직접 노출한다.
+        public Dictionary<TKey, TValue>.Enumerator GetEnumerator() => Forward.GetEnumerator();
+
+        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() => Forward.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => Forward.GetEnumerator();
     }
 }
