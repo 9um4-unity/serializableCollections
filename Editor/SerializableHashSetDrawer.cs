@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditorInternal;
@@ -15,6 +16,20 @@ namespace Gum4.SerializableCollections.Editor
 
         private readonly Dictionary<(Object obj, string path), ReorderableList> _cache = new();
 
+        // [ElementAttribute(ElementTarget.Item, ...)]로 HashSet 필드에 붙은 PropertyAttribute를
+        // Item에 대신 적용하기 위해 미리 풀어둔다.
+        private PropertyAttribute[] _itemAttrs = Array.Empty<PropertyAttribute>();
+        private bool _elementAttrsResolved;
+
+        private void ResolveElementAttributes()
+        {
+            if (_elementAttrsResolved) return;
+            _elementAttrsResolved = true;
+            if (fieldInfo == null) return;
+            var byTarget = ElementAttributeForwarder.ResolveAll(fieldInfo);
+            if (byTarget.TryGetValue(ElementTarget.Item, out var i)) _itemAttrs = i;
+        }
+
         private ReorderableList GetList(SerializedProperty setProp)
         {
             var target = setProp.serializedObject.targetObject;
@@ -28,7 +43,7 @@ namespace Gum4.SerializableCollections.Editor
             return list;
         }
 
-        private static ReorderableList BuildList(SerializedProperty setProp)
+        private ReorderableList BuildList(SerializedProperty setProp)
         {
             var itemsProp = setProp.FindPropertyRelative(ItemsField);
             var list = new ReorderableList(
@@ -41,7 +56,7 @@ namespace Gum4.SerializableCollections.Editor
             list.elementHeightCallback = index =>
             {
                 var elem = list.serializedProperty.GetArrayElementAtIndex(index);
-                return EditorGUI.GetPropertyHeight(elem, true) + Pad * 2f;
+                return ElementAttributeForwarder.GetPropertyHeight(elem, GUIContent.none, _itemAttrs) + Pad * 2f;
             };
 
             list.drawElementCallback = (rect, index, _, _) =>
@@ -63,12 +78,12 @@ namespace Gum4.SerializableCollections.Editor
                     EditorGUI.DrawRect(rect, new Color(1f, 0.15f, 0.15f, 0.15f));
                     var prev = GUI.backgroundColor;
                     GUI.backgroundColor = new Color(1f, 0.55f, 0.55f);
-                    EditorGUI.PropertyField(rect, elem, label, true);
+                    ElementAttributeForwarder.PropertyField(rect, elem, label, _itemAttrs);
                     GUI.backgroundColor = prev;
                 }
                 else
                 {
-                    EditorGUI.PropertyField(rect, elem, label, true);
+                    ElementAttributeForwarder.PropertyField(rect, elem, label, _itemAttrs);
                 }
             };
 
@@ -102,10 +117,14 @@ namespace Gum4.SerializableCollections.Editor
         // ── PropertyDrawer 진입점 ────────────────────────────────
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-            => GetList(property).GetHeight();
+        {
+            ResolveElementAttributes();
+            return GetList(property).GetHeight();
+        }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
+            ResolveElementAttributes();
             EditorGUI.BeginProperty(position, label, property);
             // ReorderableList는 indentLevel을 무시하므로, 중첩된 필드일 때 부모 들여쓰기에 맞춰 직접 보정한다.
             position = EditorGUI.IndentedRect(position);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditorInternal;
@@ -16,6 +17,22 @@ namespace Gum4.SerializableCollections.Editor
 
         private readonly Dictionary<(Object obj, string path), ReorderableList> _cache = new();
 
+        // [ElementAttribute(ElementTarget.Key/Value, ...)]로 딕셔너리 필드에 붙은 PropertyAttribute를
+        // Key/Value에 대신 적용하기 위해 미리 풀어둔다.
+        private PropertyAttribute[] _keyAttrs = Array.Empty<PropertyAttribute>();
+        private PropertyAttribute[] _valueAttrs = Array.Empty<PropertyAttribute>();
+        private bool _elementAttrsResolved;
+
+        private void ResolveElementAttributes()
+        {
+            if (_elementAttrsResolved) return;
+            _elementAttrsResolved = true;
+            if (fieldInfo == null) return;
+            var byTarget = ElementAttributeForwarder.ResolveAll(fieldInfo);
+            if (byTarget.TryGetValue(ElementTarget.Key, out var k)) _keyAttrs = k;
+            if (byTarget.TryGetValue(ElementTarget.Value, out var v)) _valueAttrs = v;
+        }
+
         private ReorderableList GetList(SerializedProperty dictProp)
         {
             var target   = dictProp.serializedObject.targetObject;
@@ -29,7 +46,7 @@ namespace Gum4.SerializableCollections.Editor
             return list;
         }
 
-        private static ReorderableList BuildList(SerializedProperty dictProp)
+        private ReorderableList BuildList(SerializedProperty dictProp)
         {
             var pairsProp = dictProp.FindPropertyRelative(PairsField);
             var list = new ReorderableList(
@@ -65,7 +82,7 @@ namespace Gum4.SerializableCollections.Editor
 
         // ── 렌더링 ────────────────────────────────────────────────
 
-        private static void DrawPair(Rect rect, SerializedProperty elem, bool dupKey, bool dupVal)
+        private void DrawPair(Rect rect, SerializedProperty elem, bool dupKey, bool dupVal)
         {
             if (IsSimple(elem))
             {
@@ -77,7 +94,7 @@ namespace Gum4.SerializableCollections.Editor
             // 복합형: Key 한 줄 → Value 한 줄(또는 펼쳐지는 foldout)
             var keyProp = elem.FindPropertyRelative("Key");
             var valProp = elem.FindPropertyRelative("Value");
-            var keyH    = EditorGUI.GetPropertyHeight(keyProp, true);
+            var keyH    = ElementAttributeForwarder.GetPropertyHeight(keyProp, new GUIContent("Key"), _keyAttrs);
 
             var keyRect = new Rect(rect.x, rect.y,              rect.width, keyH);
             var valRect = new Rect(rect.x, rect.y + keyH + Spacing,
@@ -85,14 +102,14 @@ namespace Gum4.SerializableCollections.Editor
 
             if (dupKey || dupVal) EditorGUI.DrawRect(rect, new Color(1f, 0.15f, 0.15f, 0.15f));
 
-            DrawField(keyRect, keyProp, new GUIContent("Key"), dupKey);
+            DrawField(keyRect, keyProp, new GUIContent("Key"), dupKey, _keyAttrs);
 
             EditorGUI.indentLevel++;
-            DrawField(valRect, valProp, new GUIContent("Value"), dupVal);
+            DrawField(valRect, valProp, new GUIContent("Value"), dupVal, _valueAttrs);
             EditorGUI.indentLevel--;
         }
 
-        private static void DrawInline(Rect rect, SerializedProperty elem, bool dupKey, bool dupVal)
+        private void DrawInline(Rect rect, SerializedProperty elem, bool dupKey, bool dupVal)
         {
             const float Arrow = 20f;
             var keyW = (rect.width - Arrow) * 0.38f;
@@ -106,17 +123,17 @@ namespace Gum4.SerializableCollections.Editor
             var keyProp = elem.FindPropertyRelative("Key");
             var valProp = elem.FindPropertyRelative("Value");
 
-            DrawField(keyRect, keyProp, GUIContent.none, dupKey);
+            DrawField(keyRect, keyProp, GUIContent.none, dupKey, _keyAttrs);
 
             var prevCol = GUI.color;
             GUI.color = new Color(0.55f, 0.55f, 0.55f);
             EditorGUI.LabelField(arrRect, "⇄", EditorStyles.centeredGreyMiniLabel);
             GUI.color = prevCol;
 
-            DrawField(valRect, valProp, GUIContent.none, dupVal);
+            DrawField(valRect, valProp, GUIContent.none, dupVal, _valueAttrs);
         }
 
-        private static void DrawField(Rect rect, SerializedProperty prop, GUIContent label, bool isDup)
+        private static void DrawField(Rect rect, SerializedProperty prop, GUIContent label, bool isDup, PropertyAttribute[] attrs)
         {
             if (isDup)
             {
@@ -124,12 +141,12 @@ namespace Gum4.SerializableCollections.Editor
                     new Color(1f, 0.2f, 0.2f, 0.35f));
                 var prev = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(1f, 0.55f, 0.55f);
-                EditorGUI.PropertyField(rect, prop, label, true);
+                ElementAttributeForwarder.PropertyField(rect, prop, label, attrs);
                 GUI.backgroundColor = prev;
             }
             else
             {
-                EditorGUI.PropertyField(rect, prop, label, true);
+                ElementAttributeForwarder.PropertyField(rect, prop, label, attrs);
             }
         }
 
@@ -152,14 +169,14 @@ namespace Gum4.SerializableCollections.Editor
             return k != null && v != null && !k.hasVisibleChildren && !v.hasVisibleChildren;
         }
 
-        private static float PairHeight(SerializedProperty elem)
+        private float PairHeight(SerializedProperty elem)
         {
             if (IsSimple(elem)) return EditorGUIUtility.singleLineHeight;
             var keyProp = elem.FindPropertyRelative("Key");
             var valProp = elem.FindPropertyRelative("Value");
-            return EditorGUI.GetPropertyHeight(keyProp, true)
+            return ElementAttributeForwarder.GetPropertyHeight(keyProp, new GUIContent("Key"), _keyAttrs)
                  + Spacing
-                 + EditorGUI.GetPropertyHeight(valProp, true);
+                 + ElementAttributeForwarder.GetPropertyHeight(valProp, new GUIContent("Value"), _valueAttrs);
         }
 
         private static bool IsDuplicate(SerializedProperty pairsProp, int self, SerializedProperty fieldProp, string fieldName)
@@ -179,10 +196,14 @@ namespace Gum4.SerializableCollections.Editor
         // ── PropertyDrawer 진입점 ────────────────────────────────
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-            => GetList(property).GetHeight();
+        {
+            ResolveElementAttributes();
+            return GetList(property).GetHeight();
+        }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
+            ResolveElementAttributes();
             EditorGUI.BeginProperty(position, label, property);
             // ReorderableList는 indentLevel을 무시하므로, 중첩된 필드일 때 부모 들여쓰기에 맞춰 직접 보정한다.
             position = EditorGUI.IndentedRect(position);

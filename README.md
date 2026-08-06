@@ -46,6 +46,31 @@ void Awake()
 private SerializableDictionary<DialoguePhase, string> dialogues;
 ```
 
+### Element attribute forwarding
+
+`Key`/`Value`(또는 `SerializableHashSet`의 원소)는 제네릭 타입 파라미터의 실제 필드라 컴파일 타임에
+직접 `[Range]`, `[Min]` 같은 Unity 내장 `PropertyAttribute`를 붙일 수 없습니다. 대신 컬렉션 필드
+자체에 `[ElementAttribute(대상, 붙이고_싶은_attribute_타입, 생성자_인자...)]`를 붙이면, 그 attribute를
+전담하는 `PropertyDrawer`를 찾아 Key/Value/Item을 그릴 때 대신 적용합니다.
+
+```csharp
+using UnityEngine;
+using Gum4.SerializableCollections;
+
+[SerializeField, ElementAttribute(ElementTarget.Value, typeof(RangeAttribute), 0f, 1f)]
+private SerializableDictionary<string, float> weightByName;
+
+[SerializeField, ElementAttribute(ElementTarget.Item, typeof(RangeAttribute), 0, 10)]
+private SerializableHashSet<int> levels;
+```
+
+- `ElementTarget.Key`/`Value`는 `SerializableDictionary`·`SerializableBiDictionary`에, `ElementTarget.Item`은
+  `SerializableHashSet`에 사용합니다.
+- 같은 대상에 여러 `[ElementAttribute]`를 붙일 수 있지만, 실제로는 매칭되는 `PropertyDrawer`가 있는
+  첫 번째 attribute만 적용됩니다(스태킹 미지원).
+- `Tooltip`처럼 전용 `PropertyDrawer`없이 Unity 내부 경로로만 동작하는 attribute는 이 방식으로 전달되지
+  않습니다. `PropertyDrawer`가 실제로 등록된 attribute(Range, Min, Multiline 등)에서만 동작을 보장합니다.
+
 ## 동작 계약
 
 - **조회는 amortized O(1)** — 내부적으로 `Dictionary`/`HashSet` 캐시를 두고, 역직렬화(Inspector 편집 포함) 시 무효화 후 다음 조회에서 재구축합니다.
