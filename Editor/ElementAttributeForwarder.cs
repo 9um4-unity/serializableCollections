@@ -29,6 +29,29 @@ namespace Gum4.SerializableCollections.Editor
 
         private static readonly Dictionary<Type, Type> DrawerTypeCache = new();
 
+        // 컬렉션 필드(SerializableDictionary<,> 등)의 제네릭 인자를 꺼내 원소의 선언 타입을 얻는다.
+        // 서브클래싱(class MyDict : SerializableDictionary<string,int>)도 지원하도록 베이스 체인을 거슬러 올라간다.
+        public static Type[] ResolveElementTypes(FieldInfo collectionField, Type openGeneric)
+        {
+            for (var t = collectionField?.FieldType; t != null; t = t.BaseType)
+                if (t.IsGenericType && t.GetGenericTypeDefinition() == openGeneric)
+                    return t.GetGenericArguments();
+            return null;
+        }
+
+        // 자식 프로퍼티가 없거나, 전용 PropertyDrawer가 한 줄로 그리는 타입이면 인라인(한 줄) 취급한다.
+        // 후자가 없으면 InterfaceReference처럼 "내부 필드는 있지만 한 줄로 그려지는" 사용자 타입이
+        // Key/Value/Item 자리에서 불필요하게 foldout 2행 레이아웃으로 밀려난다.
+        // 폴딩으로 접힌 일반 struct가 오탐되지 않도록, 전용 드로어가 실제로 등록된 타입에만 높이 검사를 적용한다.
+        public static bool IsInlineDrawn(SerializedProperty prop, Type declaredType, PropertyAttribute[] attributes)
+        {
+            if (prop == null) return false;
+            if (!prop.hasVisibleChildren) return true;
+            if (declaredType == null || FindDrawerType(declaredType) == null) return false;
+            return GetPropertyHeight(prop, GUIContent.none, attributes)
+                   <= EditorGUIUtility.singleLineHeight + 0.01f;
+        }
+
         public static Dictionary<ElementTarget, PropertyAttribute[]> ResolveAll(FieldInfo collectionField)
         {
             var result = new Dictionary<ElementTarget, PropertyAttribute[]>();
@@ -121,9 +144,11 @@ namespace Gum4.SerializableCollections.Editor
             }
         }
 
-        private static Type FindDrawerType(Type attributeType)
+        // targetType은 PropertyAttribute 타입일 수도, 값 타입일 수도 있다 —
+        // CustomPropertyDrawer의 매칭 규칙(정확히 일치 > useForChildren 상속)은 양쪽 모두 동일하다.
+        private static Type FindDrawerType(Type targetType)
         {
-            if (DrawerTypeCache.TryGetValue(attributeType, out var cached)) return cached;
+            if (DrawerTypeCache.TryGetValue(targetType, out var cached)) return cached;
 
             Type exact = null, fallback = null;
             if (CustomDrawerTypeField != null && CustomDrawerUseForChildrenField != null)
@@ -133,13 +158,13 @@ namespace Gum4.SerializableCollections.Editor
                     foreach (var cpdObj in drawerType.GetCustomAttributes(typeof(CustomPropertyDrawer), false))
                     {
                         var cpd = (CustomPropertyDrawer)cpdObj;
-                        var targetType = (Type)CustomDrawerTypeField.GetValue(cpd);
-                        if (targetType == null) continue;
+                        var drawnType = (Type)CustomDrawerTypeField.GetValue(cpd);
+                        if (drawnType == null) continue;
 
-                        if (targetType == attributeType) { exact = drawerType; break; }
+                        if (drawnType == targetType) { exact = drawerType; break; }
 
                         var useForChildren = (bool)CustomDrawerUseForChildrenField.GetValue(cpd);
-                        if (useForChildren && targetType.IsAssignableFrom(attributeType) && fallback == null)
+                        if (useForChildren && drawnType.IsAssignableFrom(targetType) && fallback == null)
                             fallback = drawerType;
                     }
                     if (exact != null) break;
@@ -147,7 +172,7 @@ namespace Gum4.SerializableCollections.Editor
             }
 
             var result = exact ?? fallback;
-            DrawerTypeCache[attributeType] = result;
+            DrawerTypeCache[targetType] = result;
             return result;
         }
     }

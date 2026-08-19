@@ -19,6 +19,7 @@ namespace Gum4.SerializableCollections.Editor
         // [ElementAttribute(ElementTarget.Item, ...)]로 HashSet 필드에 붙은 PropertyAttribute를
         // Item에 대신 적용하기 위해 미리 풀어둔다.
         private PropertyAttribute[] _itemAttrs = Array.Empty<PropertyAttribute>();
+        private Type _itemType;
         private bool _elementAttrsResolved;
 
         private void ResolveElementAttributes()
@@ -28,6 +29,9 @@ namespace Gum4.SerializableCollections.Editor
             if (fieldInfo == null) return;
             var byTarget = ElementAttributeForwarder.ResolveAll(fieldInfo);
             if (byTarget.TryGetValue(ElementTarget.Item, out var i)) _itemAttrs = i;
+
+            var args = ElementAttributeForwarder.ResolveElementTypes(fieldInfo, typeof(SerializableHashSet<>));
+            if (args != null) _itemType = args[0];
         }
 
         private ReorderableList GetList(SerializedProperty setProp)
@@ -69,9 +73,9 @@ namespace Gum4.SerializableCollections.Editor
                 rect.height -= Pad * 2f;
 
                 // 복합 타입은 "Element N" 레이블을 붙여 foldout을 표시한다
-                var label = elem.hasVisibleChildren
-                    ? new GUIContent($"Element {index}")
-                    : GUIContent.none;
+                var label = ElementAttributeForwarder.IsInlineDrawn(elem, _itemType, _itemAttrs)
+                    ? GUIContent.none
+                    : new GUIContent($"Element {index}");
 
                 if (isDup)
                 {

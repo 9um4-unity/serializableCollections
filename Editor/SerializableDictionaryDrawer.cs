@@ -37,6 +37,8 @@ namespace Gum4.SerializableCollections.Editor
         // Key/Value에 대신 적용하기 위해 미리 풀어둔다.
         private PropertyAttribute[] _keyAttrs = Array.Empty<PropertyAttribute>();
         private PropertyAttribute[] _valueAttrs = Array.Empty<PropertyAttribute>();
+        private Type _keyType;
+        private Type _valueType;
         private bool _elementAttrsResolved;
 
         private void ResolveElementAttributes()
@@ -47,6 +49,9 @@ namespace Gum4.SerializableCollections.Editor
             var byTarget = ElementAttributeForwarder.ResolveAll(fieldInfo);
             if (byTarget.TryGetValue(ElementTarget.Key, out var k)) _keyAttrs = k;
             if (byTarget.TryGetValue(ElementTarget.Value, out var v)) _valueAttrs = v;
+
+            var args = ElementAttributeForwarder.ResolveElementTypes(fieldInfo, typeof(SerializableDictionary<,>));
+            if (args != null) (_keyType, _valueType) = (args[0], args[1]);
         }
 
         private ReorderableList GetList(SerializedProperty dictProp)
@@ -206,9 +211,9 @@ namespace Gum4.SerializableCollections.Editor
             var k = elem.FindPropertyRelative("Key");
             var v = elem.FindPropertyRelative("Value");
             if (k == null || v == null) return false;
-            if (k.hasVisibleChildren || v.hasVisibleChildren) return false;
             if (IsTextAreaValue(v)) return false; // TextArea는 항상 Key 아래 세로 배치로 그린다
-            return true;
+            return ElementAttributeForwarder.IsInlineDrawn(k, _keyType, _keyAttrs)
+                && ElementAttributeForwarder.IsInlineDrawn(v, _valueType, _valueAttrs);
         }
 
         private float PairHeight(SerializedProperty elem)

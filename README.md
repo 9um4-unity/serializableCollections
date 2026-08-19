@@ -71,6 +71,33 @@ private SerializableHashSet<int> levels;
 - `Tooltip`처럼 전용 `PropertyDrawer`없이 Unity 내부 경로로만 동작하는 attribute는 이 방식으로 전달되지
   않습니다. `PropertyDrawer`가 실제로 등록된 attribute(Range, Min, Multiline 등)에서만 동작을 보장합니다.
 
+### 사용자 정의 타입을 원소로 쓰기
+
+`Key`/`Value`/`Item` 자리에는 임의의 `[Serializable]` 타입을 넣을 수 있습니다. 내부 필드가 있는 복합 타입은
+기본적으로 Key 아래 foldout 2행으로 그려지지만, **그 타입에 전용 `PropertyDrawer`가 등록되어 있고 그 드로어가
+한 줄 높이를 반환하면 인라인 한 줄로 배치**됩니다. 참조 래퍼처럼 "한 줄짜리 값"으로 설계된 타입이
+내부 필드를 가진다는 이유만으로 2행으로 밀려나지 않도록 하기 위한 규칙입니다.
+
+```csharp
+[Serializable]
+public class ItemId { [SerializeField] private string _guid; }
+
+[CustomPropertyDrawer(typeof(ItemId))]
+public class ItemIdDrawer : PropertyDrawer
+{
+    public override float GetPropertyHeight(SerializedProperty p, GUIContent l)
+        => EditorGUIUtility.singleLineHeight;   // ← 이 한 줄이 인라인 배치의 조건
+    ...
+}
+
+[SerializeField] private SerializableDictionary<ItemId, int> stockById;   // 한 줄로 그려짐
+```
+
+- 접힌 foldout도 높이가 한 줄이라 오탐이 날 수 있으므로, 전용 드로어가 **실제로 등록된** 타입에만 이 판정을 적용합니다.
+- 드로어가 여러 줄 높이를 반환하면 기존대로 Key/Value 2행 배치로 그려집니다.
+- 원소를 딕셔너리 키나 해시셋 항목으로 쓰려면 그 타입이 `Equals`/`GetHashCode`를 값 의미론에 맞게 구현해야
+  중복 검출과 조회가 의도대로 동작합니다.
+
 ## 동작 계약
 
 - **조회는 amortized O(1)** — 내부적으로 `Dictionary`/`HashSet` 캐시를 두고, 역직렬화(Inspector 편집 포함) 시 무효화 후 다음 조회에서 재구축합니다.
@@ -91,5 +118,6 @@ private SerializableHashSet<int> levels;
 ```
 Runtime/     Gum4.SerializableCollections       — 순수 로직, Editor 비의존
 Editor/      Gum4.SerializableCollections.Editor — PropertyDrawer (중복 하이라이트 포함)
-Tests/Runtime/ Gum4.SerializableCollections.Tests — EditMode/PlayMode 겸용
+Tests/Runtime/ Gum4.SerializableCollections.Tests — PlayMode
+Tests/Editor/  Gum4.SerializableCollections.Editor.Tests — EditMode
 ```
