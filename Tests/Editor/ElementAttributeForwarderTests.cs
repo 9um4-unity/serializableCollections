@@ -15,10 +15,10 @@ namespace Gum4.SerializableCollections.Editor.Tests
     {
         private class TestHolder : ScriptableObject
         {
-            [SerializeField, ElementAttribute(ElementTarget.Value, typeof(RangeAttribute), 0f, 10f)]
+            [SerializeField, ElementAttribute(ElementTarget.Value, typeof(UnityEngine.RangeAttribute), 0f, 10f)]
             public SerializableDictionary<string, float> ratios = new();
 
-            [SerializeField, ElementAttribute(ElementTarget.Item, typeof(RangeAttribute), 0, 10)]
+            [SerializeField, ElementAttribute(ElementTarget.Item, typeof(UnityEngine.RangeAttribute), 0, 10)]
             public SerializableHashSet<int> levels = new();
         }
 
