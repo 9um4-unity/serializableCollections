@@ -7,7 +7,7 @@ Unity Inspector에서 편집 가능한 `Dictionary`/`HashSet` 대체 타입.
 Package Manager → `Add package from git URL...`:
 
 ```
-https://github.com/<your-account>/SerializableCollections.git
+https://github.com/9um4-unity/serializableCollections.git
 ```
 
 로컬 개발 중에는 대상 프로젝트의 `Packages/manifest.json`에 직접 추가:
